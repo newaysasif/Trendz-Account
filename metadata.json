@@ -1,0 +1,6 @@
+{
+  "name": "Accounting Hub & Expense Management",
+  "description": "Comprehensive accounting, bank ledger statement editing, invoice management with partial/full payment receipt memos, PDF printing, WhatsApp sharing, and project/office expense tracking for TRENDZ INTERIOR.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
