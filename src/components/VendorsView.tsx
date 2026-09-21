@@ -15,6 +15,8 @@ import {
   Building,
 } from 'lucide-react';
 import { Vendor, VendorTransaction } from '../types';
+import { ReceiptImageUploader } from './ReceiptImageUploader';
+import { ReceiptThumbnail } from './ReceiptThumbnail';
 
 interface VendorsViewProps {
   vendors: Vendor[];
@@ -23,6 +25,8 @@ interface VendorsViewProps {
   onUpdateVendor: (id: number, vendor: Partial<Vendor>) => void;
   onDeleteVendor: (id: number) => void;
   onAddVendorTransaction: (tx: Omit<VendorTransaction, 'id'>) => void;
+  onUpdateVendorTransaction?: (id: number, tx: Partial<VendorTransaction>) => void;
+  onDeleteVendorTransaction?: (id: number) => void;
   onOpenWhatsApp: (message: string) => void;
 }
 
@@ -33,6 +37,8 @@ export const VendorsView: React.FC<VendorsViewProps> = ({
   onUpdateVendor,
   onDeleteVendor,
   onAddVendorTransaction,
+  onUpdateVendorTransaction,
+  onDeleteVendorTransaction,
   onOpenWhatsApp,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -40,6 +46,7 @@ export const VendorsView: React.FC<VendorsViewProps> = ({
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
   const [ledgerVendor, setLedgerVendor] = useState<Vendor | null>(null);
   const [isAddTxModalOpen, setIsAddTxModalOpen] = useState(false);
+  const [editingTx, setEditingTx] = useState<VendorTransaction | null>(null);
 
   // Vendor Form State
   const [vendorForm, setVendorForm] = useState({
@@ -51,14 +58,26 @@ export const VendorsView: React.FC<VendorsViewProps> = ({
   });
 
   // Transaction Form State
-  const [txForm, setTxForm] = useState({
+  const [txForm, setTxForm] = useState<{
+    trans_date: string;
+    description: string;
+    qty: string;
+    rate: string;
+    discount: string;
+    amount: string;
+    trans_type: 'debit' | 'credit';
+    receipt_image?: string;
+    receipt_image_name?: string;
+  }>({
     trans_date: new Date().toISOString().split('T')[0],
     description: '',
     qty: '',
     rate: '',
     discount: '',
     amount: '',
-    trans_type: 'debit' as 'debit' | 'credit',
+    trans_type: 'debit',
+    receipt_image: undefined,
+    receipt_image_name: undefined,
   });
 
   const filteredVendors = vendors.filter(
@@ -91,6 +110,31 @@ export const VendorsView: React.FC<VendorsViewProps> = ({
   );
 
   const balancePayable = totalPurchasesDebit - totalPaidCredit;
+
+  const ledgerTxsWithBalance = useMemo(() => {
+    if (!ledgerVendor) return [];
+    const sortedAsc = [...currentLedgerTxs].sort((a, b) => {
+      const timeA = new Date(a.trans_date).getTime();
+      const timeB = new Date(b.trans_date).getTime();
+      return timeA !== timeB ? timeA - timeB : a.id - b.id;
+    });
+
+    let runningBal = 0;
+    const balanceMap = new Map<number, number>();
+    sortedAsc.forEach((tx) => {
+      if (tx.trans_type === 'debit') {
+        runningBal += tx.amount;
+      } else {
+        runningBal -= tx.amount;
+      }
+      balanceMap.set(tx.id, runningBal);
+    });
+
+    return currentLedgerTxs.map((tx) => ({
+      ...tx,
+      runningBalance: balanceMap.get(tx.id) ?? 0,
+    }));
+  }, [ledgerVendor, currentLedgerTxs]);
 
   const handleOpenAddVendor = () => {
     setVendorForm({
@@ -140,6 +184,46 @@ export const VendorsView: React.FC<VendorsViewProps> = ({
     }
   };
 
+  const handleOpenAddTx = () => {
+    setEditingTx(null);
+    setTxForm({
+      trans_date: new Date().toISOString().split('T')[0],
+      description: '',
+      qty: '',
+      rate: '',
+      discount: '',
+      amount: '',
+      trans_type: 'debit',
+      receipt_image: undefined,
+      receipt_image_name: undefined,
+    });
+    setIsAddTxModalOpen(true);
+  };
+
+  const handleOpenEditTx = (tx: VendorTransaction) => {
+    setEditingTx(tx);
+    setTxForm({
+      trans_date: tx.trans_date,
+      description: tx.description,
+      qty: tx.qty > 0 ? tx.qty.toString() : '',
+      rate: tx.rate > 0 ? tx.rate.toString() : '',
+      discount: tx.discount > 0 ? tx.discount.toString() : '',
+      amount: tx.amount.toString(),
+      trans_type: tx.trans_type,
+      receipt_image: tx.receipt_image,
+      receipt_image_name: tx.receipt_image_name,
+    });
+    setIsAddTxModalOpen(true);
+  };
+
+  const handleDeleteTx = (id: number) => {
+    if (confirm('Are you sure you want to delete this transaction? This will automatically recalculate the vendor balance.')) {
+      if (onDeleteVendorTransaction) {
+        onDeleteVendorTransaction(id);
+      }
+    }
+  };
+
   const handleSubmitTx = (e: React.FormEvent) => {
     e.preventDefault();
     if (!ledgerVendor) return;
@@ -149,16 +233,35 @@ export const VendorsView: React.FC<VendorsViewProps> = ({
       return;
     }
 
-    onAddVendorTransaction({
-      vendor_id: ledgerVendor.id,
-      trans_date: txForm.trans_date,
-      description: txForm.description.trim(),
-      qty: parseFloat(txForm.qty) || 0,
-      rate: parseFloat(txForm.rate) || 0,
-      discount: parseFloat(txForm.discount) || 0,
-      amount: amt,
-      trans_type: txForm.trans_type,
-    });
+    if (editingTx) {
+      if (onUpdateVendorTransaction) {
+        onUpdateVendorTransaction(editingTx.id, {
+          trans_date: txForm.trans_date,
+          description: txForm.description.trim(),
+          qty: parseFloat(txForm.qty) || 0,
+          rate: parseFloat(txForm.rate) || 0,
+          discount: parseFloat(txForm.discount) || 0,
+          amount: amt,
+          trans_type: txForm.trans_type,
+          receipt_image: txForm.receipt_image,
+          receipt_image_name: txForm.receipt_image_name,
+        });
+      }
+      setEditingTx(null);
+    } else {
+      onAddVendorTransaction({
+        vendor_id: ledgerVendor.id,
+        trans_date: txForm.trans_date,
+        description: txForm.description.trim(),
+        qty: parseFloat(txForm.qty) || 0,
+        rate: parseFloat(txForm.rate) || 0,
+        discount: parseFloat(txForm.discount) || 0,
+        amount: amt,
+        trans_type: txForm.trans_type,
+        receipt_image: txForm.receipt_image,
+        receipt_image_name: txForm.receipt_image_name,
+      });
+    }
 
     setIsAddTxModalOpen(false);
     setTxForm({
@@ -169,6 +272,8 @@ export const VendorsView: React.FC<VendorsViewProps> = ({
       discount: '',
       amount: '',
       trans_type: 'debit',
+      receipt_image: undefined,
+      receipt_image_name: undefined,
     });
   };
 
@@ -414,15 +519,15 @@ export const VendorsView: React.FC<VendorsViewProps> = ({
                 </h5>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setIsAddTxModalOpen(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold"
+                    onClick={handleOpenAddTx}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold shadow-xs transition-colors"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>Add Transaction</span>
                   </button>
                   <button
                     onClick={() => handleSendVendorWhatsApp(ledgerVendor)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-xs transition-colors"
                   >
                     <Send className="w-3.5 h-3.5" />
                     <span>WhatsApp</span>
@@ -430,26 +535,46 @@ export const VendorsView: React.FC<VendorsViewProps> = ({
                 </div>
               </div>
 
-              {/* Ledger Table */}
-              <div className="border border-slate-200 rounded-xl overflow-hidden">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-100 font-bold text-slate-700 uppercase">
+              {/* Ledger Table with Sticky Header and Running Balance */}
+              <div className="border border-slate-200 rounded-xl overflow-hidden max-h-[50vh] overflow-y-auto relative">
+                <table className="w-full text-left text-xs min-w-[750px]">
+                  <thead className="sticky top-0 z-20 bg-slate-100 font-bold text-slate-700 uppercase shadow-xs border-b border-slate-200">
                     <tr>
-                      <th className="py-2.5 px-3">Date</th>
-                      <th className="py-2.5 px-3">Description</th>
+                      <th className="py-2.5 px-3 sticky left-0 z-30 bg-slate-100 w-24">Date</th>
+                      <th className="py-2.5 px-3 sticky left-24 z-30 bg-slate-100 min-w-[180px] border-r border-slate-200 shadow-[4px_0_6px_-2px_rgba(0,0,0,0.06)]">
+                        Description
+                      </th>
                       <th className="py-2.5 px-3 text-right">Qty</th>
                       <th className="py-2.5 px-3 text-right">Rate (Rs.)</th>
                       <th className="py-2.5 px-3 text-right">Amount (Rs.)</th>
                       <th className="py-2.5 px-3 text-center">Type</th>
+                      <th className="py-2.5 px-3 text-right border-l border-slate-200 font-bold text-amber-900 w-32">
+                        Balance (Rs.)
+                      </th>
+                      <th className="py-2.5 px-3 text-center sticky right-0 z-30 bg-slate-100 border-l border-slate-200 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.06)] w-24">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
-                    {currentLedgerTxs.length > 0 ? (
-                      currentLedgerTxs.map((t) => (
-                        <tr key={t.id} className="hover:bg-slate-50">
-                          <td className="py-2.5 px-3 whitespace-nowrap">{t.trans_date}</td>
-                          <td className="py-2.5 px-3 font-medium text-slate-900">
-                            {t.description}
+                    {ledgerTxsWithBalance.length > 0 ? (
+                      ledgerTxsWithBalance.map((t) => (
+                        <tr key={t.id} className="hover:bg-slate-50 group">
+                          <td className="py-2.5 px-3 whitespace-nowrap sticky left-0 z-10 bg-white group-hover:bg-slate-50">
+                            {t.trans_date}
+                          </td>
+                          <td className="py-2.5 px-3 font-medium text-slate-900 sticky left-24 z-10 bg-white group-hover:bg-slate-50 border-r border-slate-200 shadow-[4px_0_6px_-2px_rgba(0,0,0,0.06)]">
+                            <div className="flex items-center justify-between gap-1.5">
+                              <span className="truncate">{t.description}</span>
+                              {t.receipt_image && (
+                                <ReceiptThumbnail
+                                  image={t.receipt_image}
+                                  imageName={t.receipt_image_name}
+                                  title={`Voucher: ${t.description}`}
+                                  size="sm"
+                                />
+                              )}
+                            </div>
                           </td>
                           <td className="py-2.5 px-3 text-right">{t.qty || '-'}</td>
                           <td className="py-2.5 px-3 text-right">
@@ -462,18 +587,43 @@ export const VendorsView: React.FC<VendorsViewProps> = ({
                             <span
                               className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                                 t.trans_type === 'debit'
-                                  ? 'bg-rose-100 text-rose-800'
-                                  : 'bg-emerald-100 text-emerald-800'
+                                   ? 'bg-rose-100 text-rose-800'
+                                   : 'bg-emerald-100 text-emerald-800'
                               }`}
                             >
                               {t.trans_type.toUpperCase()}
                             </span>
                           </td>
+                          <td
+                            className={`py-2.5 px-3 text-right font-bold font-mono whitespace-nowrap border-l border-slate-200 ${
+                              t.runningBalance > 0 ? 'text-rose-600' : 'text-emerald-600'
+                            }`}
+                          >
+                            Rs. {t.runningBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="py-2 px-3 text-center sticky right-0 z-10 bg-white group-hover:bg-slate-50 border-l border-slate-200 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.06)] whitespace-nowrap">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                onClick={() => handleOpenEditTx(t)}
+                                title="Edit Transaction"
+                                className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteTx(t.id)}
+                                title="Delete Transaction"
+                                className="p-1 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded transition-colors"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={6} className="py-6 text-center text-slate-400">
+                        <td colSpan={8} className="py-6 text-center text-slate-400">
                           No transactions found for this vendor.
                         </td>
                       </tr>
@@ -495,17 +645,20 @@ export const VendorsView: React.FC<VendorsViewProps> = ({
         </div>
       )}
 
-      {/* Add Transaction Modal */}
+      {/* Add / Edit Transaction Modal */}
       {isAddTxModalOpen && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 no-print">
           <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
             <div className="bg-amber-600 text-white px-6 py-4 flex items-center justify-between">
               <h4 className="font-bold text-base flex items-center gap-2 m-0">
-                <Plus className="w-4 h-4" />
-                <span>Add Vendor Transaction</span>
+                {editingTx ? <Edit2 className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                <span>{editingTx ? 'Edit Vendor Transaction' : 'Add Vendor Transaction'}</span>
               </h4>
               <button
-                onClick={() => setIsAddTxModalOpen(false)}
+                onClick={() => {
+                  setIsAddTxModalOpen(false);
+                  setEditingTx(null);
+                }}
                 className="text-white font-bold"
               >
                 ×
@@ -606,10 +759,27 @@ export const VendorsView: React.FC<VendorsViewProps> = ({
                 />
               </div>
 
+              {/* Receipt / Invoice Image Attachment */}
+              <div className="p-3 bg-slate-900 rounded-xl border border-slate-700">
+                <ReceiptImageUploader
+                  idPrefix="vendor-tx"
+                  receiptImage={txForm.receipt_image}
+                  receiptImageName={txForm.receipt_image_name}
+                  onChange={(img, name) =>
+                    setTxForm({ ...txForm, receipt_image: img, receipt_image_name: name })
+                  }
+                  label="Attach Vendor Invoice / Delivery Receipt / Voucher"
+                  helperText="Upload photo of manual vendor invoice, goods received note, or payment slip"
+                />
+              </div>
+
               <div className="pt-3 border-t border-slate-200 flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setIsAddTxModalOpen(false)}
+                  onClick={() => {
+                    setIsAddTxModalOpen(false);
+                    setEditingTx(null);
+                  }}
                   className="px-3 py-1.5 text-slate-600 font-semibold"
                 >
                   Cancel
@@ -618,7 +788,7 @@ export const VendorsView: React.FC<VendorsViewProps> = ({
                   type="submit"
                   className="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg shadow-sm"
                 >
-                  Save Entry
+                  {editingTx ? 'Update Entry' : 'Save Entry'}
                 </button>
               </div>
             </form>

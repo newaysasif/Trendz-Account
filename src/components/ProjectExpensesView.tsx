@@ -24,6 +24,8 @@ import {
   FolderPlus,
 } from 'lucide-react';
 import { Project, ProjectExpense, Bank } from '../types';
+import { ReceiptImageUploader } from './ReceiptImageUploader';
+import { ReceiptThumbnail } from './ReceiptThumbnail';
 
 interface ProjectExpensesViewProps {
   projects: Project[];
@@ -79,6 +81,8 @@ export const ProjectExpensesView: React.FC<ProjectExpensesViewProps> = ({
     bank_id: string;
     amount: string;
     notes: string;
+    receipt_image?: string;
+    receipt_image_name?: string;
   }>({
     project_id: projects[0]?.id.toString() || '',
     expense_date: new Date().toISOString().split('T')[0],
@@ -90,6 +94,8 @@ export const ProjectExpensesView: React.FC<ProjectExpensesViewProps> = ({
     bank_id: banks[0]?.id.toString() || '',
     amount: '',
     notes: '',
+    receipt_image: undefined,
+    receipt_image_name: undefined,
   });
 
   // Form State for New Project
@@ -198,6 +204,8 @@ export const ProjectExpensesView: React.FC<ProjectExpensesViewProps> = ({
       bank_id: banks[0]?.id.toString() || '',
       amount: '',
       notes: '',
+      receipt_image: undefined,
+      receipt_image_name: undefined,
     });
     setIsAddExpenseModalOpen(true);
   };
@@ -215,6 +223,8 @@ export const ProjectExpensesView: React.FC<ProjectExpensesViewProps> = ({
       bank_id: exp.bank_id?.toString() || (banks[0]?.id.toString() || ''),
       amount: exp.amount.toString(),
       notes: exp.notes || '',
+      receipt_image: exp.receipt_image,
+      receipt_image_name: exp.receipt_image_name,
     });
   };
 
@@ -244,6 +254,8 @@ export const ProjectExpensesView: React.FC<ProjectExpensesViewProps> = ({
           : undefined,
       amount: amountNum,
       notes: formData.notes.trim() || undefined,
+      receipt_image: formData.receipt_image,
+      receipt_image_name: formData.receipt_image_name,
     };
 
     if (editingExpense) {
@@ -658,7 +670,17 @@ export const ProjectExpensesView: React.FC<ProjectExpensesViewProps> = ({
                       </span>
                     </td>
                     <td className="py-3 px-4 font-medium text-slate-900 max-w-xs">
-                      <div>{exp.description}</div>
+                      <div className="flex items-center justify-between gap-2">
+                        <div>{exp.description}</div>
+                        {exp.receipt_image && (
+                          <ReceiptThumbnail
+                            image={exp.receipt_image}
+                            imageName={exp.receipt_image_name}
+                            title={`Voucher: ${exp.description}`}
+                            size="sm"
+                          />
+                        )}
+                      </div>
                       {exp.notes && (
                         <div className="text-xs text-slate-500 mt-0.5 italic">
                           {exp.notes}
@@ -937,6 +959,20 @@ export const ProjectExpensesView: React.FC<ProjectExpensesViewProps> = ({
                 />
               </div>
 
+              {/* Receipt / Voucher Image Attachment */}
+              <div className="p-3 bg-slate-900 rounded-xl border border-slate-700">
+                <ReceiptImageUploader
+                  idPrefix="project-expense"
+                  receiptImage={formData.receipt_image}
+                  receiptImageName={formData.receipt_image_name}
+                  onChange={(img, name) =>
+                    setFormData({ ...formData, receipt_image: img, receipt_image_name: name })
+                  }
+                  label="Attach Site Delivery Voucher / Bill / Receipt"
+                  helperText="Upload photo of manual site delivery challan, contractor bill, or voucher"
+                />
+              </div>
+
               <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-2">
                 <button
                   type="button"
@@ -1153,6 +1189,32 @@ export const ProjectExpensesView: React.FC<ProjectExpensesViewProps> = ({
                 <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
                   <span className="text-xs text-slate-500 uppercase font-bold">Site Audit Notes:</span>
                   <p className="text-xs text-slate-700 mt-1 m-0">{viewingExpense.notes}</p>
+                </div>
+              )}
+
+              {/* Attached Site Voucher / Receipt Slip Image */}
+              {viewingExpense.receipt_image && (
+                <div className="border border-amber-200 bg-amber-50/40 rounded-xl p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold uppercase text-amber-900">
+                      Attached Physical / Digital Voucher:
+                    </span>
+                    <a
+                      href={viewingExpense.receipt_image}
+                      download={viewingExpense.receipt_image_name || 'site-voucher.jpg'}
+                      className="text-2xs text-amber-700 hover:text-amber-900 underline font-semibold cursor-pointer"
+                    >
+                      Download Original
+                    </a>
+                  </div>
+                  <div className="flex justify-center bg-white rounded-lg p-2 border border-amber-100">
+                    <img
+                      src={viewingExpense.receipt_image}
+                      alt="Site Expense Voucher"
+                      referrerPolicy="no-referrer"
+                      className="max-h-56 object-contain rounded"
+                    />
+                  </div>
                 </div>
               )}
 

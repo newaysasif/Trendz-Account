@@ -20,6 +20,8 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { OfficeExpense, Bank } from '../types';
+import { ReceiptImageUploader } from './ReceiptImageUploader';
+import { ReceiptThumbnail } from './ReceiptThumbnail';
 
 interface OfficeExpensesViewProps {
   expenses: OfficeExpense[];
@@ -79,6 +81,8 @@ export const OfficeExpensesView: React.FC<OfficeExpensesViewProps> = ({
     bill_no: string;
     amount: string;
     notes: string;
+    receipt_image?: string;
+    receipt_image_name?: string;
   }>({
     expense_date: new Date().toISOString().split('T')[0],
     category: 'Office Supplies',
@@ -89,6 +93,8 @@ export const OfficeExpensesView: React.FC<OfficeExpensesViewProps> = ({
     bill_no: '',
     amount: '',
     notes: '',
+    receipt_image: undefined,
+    receipt_image_name: undefined,
   });
 
   // Filtered Expenses
@@ -168,6 +174,8 @@ export const OfficeExpensesView: React.FC<OfficeExpensesViewProps> = ({
       bill_no: '',
       amount: '',
       notes: '',
+      receipt_image: undefined,
+      receipt_image_name: undefined,
     });
     setIsAddModalOpen(true);
   };
@@ -184,6 +192,8 @@ export const OfficeExpensesView: React.FC<OfficeExpensesViewProps> = ({
       bill_no: exp.bill_no || '',
       amount: exp.amount.toString(),
       notes: exp.notes || '',
+      receipt_image: exp.receipt_image,
+      receipt_image_name: exp.receipt_image_name,
     });
   };
 
@@ -203,11 +213,13 @@ export const OfficeExpensesView: React.FC<OfficeExpensesViewProps> = ({
       payment_method: formData.payment_method,
       bank_id:
         formData.payment_method !== 'Cash / Petty Cash' && formData.bank_id
-          ? parseInt(formData.bank_id, 10)
-          : undefined,
+            ? parseInt(formData.bank_id, 10)
+            : undefined,
       bill_no: formData.bill_no.trim() || undefined,
       amount: amountNum,
       notes: formData.notes.trim() || undefined,
+      receipt_image: formData.receipt_image,
+      receipt_image_name: formData.receipt_image_name,
     };
 
     if (editingExpense) {
@@ -540,7 +552,17 @@ export const OfficeExpensesView: React.FC<OfficeExpensesViewProps> = ({
                       </span>
                     </td>
                     <td className="py-3 px-4 font-medium text-slate-900 max-w-xs">
-                      <div>{exp.description}</div>
+                      <div className="flex items-center justify-between gap-2">
+                        <div>{exp.description}</div>
+                        {exp.receipt_image && (
+                          <ReceiptThumbnail
+                            image={exp.receipt_image}
+                            imageName={exp.receipt_image_name}
+                            title={`Receipt: ${exp.description}`}
+                            size="sm"
+                          />
+                        )}
+                      </div>
                       {exp.notes && (
                         <div className="text-xs text-slate-500 mt-0.5 italic">
                           {exp.notes}
@@ -811,6 +833,20 @@ export const OfficeExpensesView: React.FC<OfficeExpensesViewProps> = ({
                 />
               </div>
 
+              {/* Receipt / Voucher Image Attachment */}
+              <div className="p-3 bg-slate-900 rounded-xl border border-slate-700">
+                <ReceiptImageUploader
+                  idPrefix="office-expense"
+                  receiptImage={formData.receipt_image}
+                  receiptImageName={formData.receipt_image_name}
+                  onChange={(img, name) =>
+                    setFormData({ ...formData, receipt_image: img, receipt_image_name: name })
+                  }
+                  label="Attach Receipt / Cash Memo / Bill Voucher"
+                  helperText="Upload photo of manual expense receipt, store bill, or payment voucher"
+                />
+              </div>
+
               <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-2">
                 <button
                   type="button"
@@ -902,6 +938,32 @@ export const OfficeExpensesView: React.FC<OfficeExpensesViewProps> = ({
                 <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
                   <span className="text-xs text-slate-500 uppercase font-bold">Audit Notes:</span>
                   <p className="text-xs text-slate-700 mt-1 m-0">{viewingExpense.notes}</p>
+                </div>
+              )}
+
+              {/* Attached Receipt Image */}
+              {viewingExpense.receipt_image && (
+                <div className="border border-sky-200 bg-sky-50/40 rounded-xl p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold uppercase text-sky-900">
+                      Attached Physical / Digital Voucher:
+                    </span>
+                    <a
+                      href={viewingExpense.receipt_image}
+                      download={viewingExpense.receipt_image_name || 'expense-receipt.jpg'}
+                      className="text-2xs text-sky-700 hover:text-sky-900 underline font-semibold cursor-pointer"
+                    >
+                      Download Original
+                    </a>
+                  </div>
+                  <div className="flex justify-center bg-white rounded-lg p-2 border border-sky-100">
+                    <img
+                      src={viewingExpense.receipt_image}
+                      alt="Expense Receipt"
+                      referrerPolicy="no-referrer"
+                      className="max-h-56 object-contain rounded"
+                    />
+                  </div>
                 </div>
               )}
 

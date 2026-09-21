@@ -20,6 +20,8 @@ import {
   Receipt,
   ArrowRight,
   Sparkles,
+  Pin,
+  PinOff,
 } from 'lucide-react';
 import { Invoice, InvoiceItem, Customer, Product, Bank, PaymentReceipt } from '../types';
 import { TrendzLogo, TrendzLogoMark } from './TrendzLogo';
@@ -89,6 +91,7 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
   const [paymentModalInvoice, setPaymentModalInvoice] = useState<Invoice | null>(null);
+  const [freezeColumns, setFreezeColumns] = useState(true);
 
   // Form State for Create/Edit Invoice
   const [invoiceNo, setInvoiceNo] = useState('');
@@ -564,7 +567,29 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
             className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500"
           />
         </div>
-        <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end flex-wrap">
+          <button
+            onClick={() => setFreezeColumns(!freezeColumns)}
+            title="Toggle frozen Customer Name and Balance Due columns when scrolling"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors cursor-pointer shadow-xs ${
+              freezeColumns
+                ? 'bg-emerald-50 border-emerald-300 text-emerald-800 hover:bg-emerald-100'
+                : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            {freezeColumns ? (
+              <>
+                <Pin className="w-3.5 h-3.5 text-emerald-600 fill-emerald-600" />
+                <span>Frozen: Name & Balance (ON)</span>
+              </>
+            ) : (
+              <>
+                <PinOff className="w-3.5 h-3.5 text-slate-400" />
+                <span>Freeze: OFF</span>
+              </>
+            )}
+          </button>
+
           <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg text-xs font-medium text-slate-600">
             <button
               onClick={() => setStatusFilter('all')}
@@ -605,20 +630,62 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
         </div>
       </div>
 
-      {/* Invoice List Table */}
+      {/* Invoice List Table with Freeze Panes */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-sm">
-            <thead>
-              <tr className="bg-slate-100/90 text-slate-700 text-xs uppercase font-bold border-b border-slate-200">
-                <th className="py-3.5 px-4">Invoice #</th>
-                <th className="py-3.5 px-4">Date</th>
-                <th className="py-3.5 px-4">Customer Name</th>
-                <th className="py-3.5 px-4 text-center">Status</th>
-                <th className="py-3.5 px-4 text-right">Grand Total</th>
-                <th className="py-3.5 px-4 text-right text-emerald-700">Paid Amount</th>
-                <th className="py-3.5 px-4 text-right text-rose-700 font-bold">Balance Due</th>
-                <th className="py-3.5 px-4 text-center no-print">Actions</th>
+        <div className="overflow-x-auto max-h-[75vh] overflow-y-auto relative">
+          <table className="w-full text-left border-collapse text-sm min-w-[1050px]">
+            <thead className="sticky top-0 z-20 bg-slate-100/95 backdrop-blur-xs shadow-xs border-b border-slate-200">
+              <tr className="text-slate-700 text-xs uppercase font-bold">
+                <th
+                  className={`py-3.5 px-4 w-28 ${
+                    freezeColumns ? 'sticky left-0 z-30 bg-slate-100' : ''
+                  }`}
+                >
+                  Invoice #
+                </th>
+                <th
+                  className={`py-3.5 px-4 min-w-[220px] ${
+                    freezeColumns
+                      ? 'sticky left-28 z-30 bg-slate-100 border-r border-slate-200 shadow-[4px_0_6px_-2px_rgba(0,0,0,0.06)]'
+                      : ''
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>Customer Name</span>
+                    {freezeColumns && (
+                      <span className="text-[10px] text-emerald-700 font-bold bg-emerald-100 px-1.5 py-0.2 rounded">
+                        Frozen
+                      </span>
+                    )}
+                  </div>
+                </th>
+                <th className="py-3.5 px-4 w-28 whitespace-nowrap">Date</th>
+                <th className="py-3.5 px-4 text-center w-28">Status</th>
+                <th className="py-3.5 px-4 text-right w-36">Grand Total</th>
+                <th className="py-3.5 px-4 text-right text-emerald-700 w-36">Paid Amount</th>
+                <th
+                  className={`py-3.5 px-4 text-right text-rose-700 font-black w-44 ${
+                    freezeColumns
+                      ? 'sticky right-44 z-30 bg-slate-100 border-l border-slate-200 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.06)]'
+                      : ''
+                  }`}
+                >
+                  <div className="flex items-center justify-end gap-1.5">
+                    <span>Balance Due</span>
+                    {freezeColumns && (
+                      <span className="text-[10px] text-rose-700 font-bold bg-rose-100 px-1.5 py-0.2 rounded">
+                        Frozen
+                      </span>
+                    )}
+                  </div>
+                </th>
+                <th
+                  className={`py-3.5 px-4 text-center no-print w-44 ${
+                    freezeColumns ? 'sticky right-0 z-30 bg-slate-100' : ''
+                  }`}
+                >
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
@@ -630,18 +697,28 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
                   const isPartial = paid > 0 && due > 0;
 
                   return (
-                    <tr key={inv.id} className="hover:bg-slate-50/80 transition-colors group">
-                      <td className="py-3 px-4 font-mono font-bold text-blue-600 whitespace-nowrap">
+                    <tr key={inv.id} className="hover:bg-slate-50/90 transition-colors group">
+                      <td
+                        className={`py-3 px-4 font-mono font-bold text-blue-600 whitespace-nowrap ${
+                          freezeColumns ? 'sticky left-0 z-10 bg-white group-hover:bg-slate-50' : ''
+                        }`}
+                      >
                         {inv.invoice_no}
                       </td>
-                      <td className="py-3 px-4 text-slate-700 whitespace-nowrap font-mono text-xs">
-                        {inv.invoice_date}
-                      </td>
-                      <td className="py-3 px-4">
+                      <td
+                        className={`py-3 px-4 ${
+                          freezeColumns
+                            ? 'sticky left-28 z-10 bg-white group-hover:bg-slate-50 border-r border-slate-200 shadow-[4px_0_6px_-2px_rgba(0,0,0,0.06)]'
+                            : ''
+                        }`}
+                      >
                         <div className="font-bold text-slate-900">{inv.customer_name}</div>
                         {inv.notes && (
                           <div className="text-xs text-slate-400 truncate max-w-xs">{inv.notes}</div>
                         )}
+                      </td>
+                      <td className="py-3 px-4 text-slate-700 whitespace-nowrap font-mono text-xs">
+                        {inv.invoice_date}
                       </td>
                       <td className="py-3 px-4 text-center">
                         {isPaid ? (
@@ -669,12 +746,24 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
                           ? `Rs. ${paid.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
                           : '-'}
                       </td>
-                      <td className="py-3 px-4 text-right font-mono font-black text-rose-600 whitespace-nowrap">
+                      <td
+                        className={`py-3 px-4 text-right font-mono font-black whitespace-nowrap ${
+                          due > 0 ? 'text-rose-600' : 'text-slate-400'
+                        } ${
+                          freezeColumns
+                            ? 'sticky right-44 z-10 bg-white group-hover:bg-slate-50 border-l border-slate-200 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.06)]'
+                            : ''
+                        }`}
+                      >
                         {due > 0
                           ? `Rs. ${due.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
                           : 'Rs. 0.00'}
                       </td>
-                      <td className="py-3 px-4 text-center no-print">
+                      <td
+                        className={`py-3 px-4 text-center no-print ${
+                          freezeColumns ? 'sticky right-0 z-10 bg-white group-hover:bg-slate-50' : ''
+                        }`}
+                      >
                         <div className="flex items-center justify-center gap-1">
                           {/* Payment Receive Option */}
                           {!isPaid && (
@@ -732,6 +821,52 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
                 </tr>
               )}
             </tbody>
+            <tfoot className="sticky bottom-0 z-20 bg-slate-100 font-bold text-slate-900 border-t-2 border-slate-300">
+              <tr>
+                <td
+                  colSpan={2}
+                  className={`py-3 px-4 text-right ${
+                    freezeColumns ? 'sticky left-0 z-30 bg-slate-100' : ''
+                  }`}
+                >
+                  Filtered Totals ({filteredInvoices.length}):
+                </td>
+                <td></td>
+                <td></td>
+                <td className="py-3 px-4 text-right font-mono text-slate-900 font-bold">
+                  Rs.{' '}
+                  {filteredInvoices
+                    .reduce((s, inv) => s + inv.grand_total, 0)
+                    .toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </td>
+                <td className="py-3 px-4 text-right font-mono text-emerald-700 font-bold">
+                  Rs.{' '}
+                  {filteredInvoices
+                    .reduce((s, inv) => s + (inv.paid_amount || 0), 0)
+                    .toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </td>
+                <td
+                  className={`py-3 px-4 text-right font-mono text-rose-700 font-black ${
+                    freezeColumns
+                      ? 'sticky right-44 z-30 bg-slate-100 border-l border-slate-200'
+                      : ''
+                  }`}
+                >
+                  Rs.{' '}
+                  {filteredInvoices
+                    .reduce((s, inv) => {
+                      const due = inv.due_amount ?? Math.max(0, inv.grand_total - (inv.paid_amount || 0));
+                      return s + due;
+                    }, 0)
+                    .toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </td>
+                <td
+                  className={`no-print ${
+                    freezeColumns ? 'sticky right-0 z-30 bg-slate-100' : ''
+                  }`}
+                ></td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       </div>

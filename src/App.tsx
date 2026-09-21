@@ -41,6 +41,14 @@ import { InvoicesView } from './components/InvoicesView';
 import { ReceiptMemosView } from './components/ReceiptMemosView';
 import { WhatsAppModal } from './components/WhatsAppModal';
 import { AuthLockScreen } from './components/AuthLockScreen';
+import { DataBackupModal } from './components/DataBackupModal';
+import { BackupRestoreView } from './components/BackupRestoreView';
+import {
+  subscribeToCloudData,
+  saveToCloudData,
+  AppDataPayload,
+  fetchCurrentCloudData,
+} from './services/firebaseSync';
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
@@ -48,6 +56,14 @@ export default function App() {
   });
   const [activeTab, setActiveTab] = useState<ActiveTab>('invoices');
   const [whatsAppMsg, setWhatsAppMsg] = useState<string | null>(null);
+  const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
+
+  // Cloud Real-Time Sync Status
+  const [cloudSyncStatus, setCloudSyncStatus] = useState<'synced' | 'syncing' | 'offline' | 'error'>('syncing');
+  const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
+
+  const isRemoteUpdateRef = React.useRef(false);
+  const isInitialLoadedRef = React.useRef(false);
 
   // Persistent States
   const [banks, setBanks] = useState<Bank[]>(() => {
@@ -110,56 +126,245 @@ export default function App() {
     return saved ? JSON.parse(saved) : initialProjectExpenses;
   });
 
-  // Save to localStorage
+  // 1. Setup Real-time Firebase Firestore listener
   useEffect(() => {
+    setCloudSyncStatus('syncing');
+
+    const unsubscribe = subscribeToCloudData(
+      (cloudData) => {
+        if (cloudData && (cloudData.invoices || cloudData.banks || cloudData.customers || cloudData.officeExpenses)) {
+          // Flag remote update to avoid echo loop back to cloud
+          isRemoteUpdateRef.current = true;
+
+          if (cloudData.banks) setBanks(cloudData.banks);
+          if (cloudData.bankTransactions) setBankTransactions(cloudData.bankTransactions);
+          if (cloudData.customers) setCustomers(cloudData.customers);
+          if (cloudData.vendors) setVendors(cloudData.vendors);
+          if (cloudData.vendorTransactions) setVendorTransactions(cloudData.vendorTransactions);
+          if (cloudData.products) setProducts(cloudData.products);
+          if (cloudData.stockMovements) setStockMovements(cloudData.stockMovements);
+          if (cloudData.invoices) setInvoices(cloudData.invoices);
+          if (cloudData.receipts) setReceipts(cloudData.receipts);
+          if (cloudData.officeExpenses) setOfficeExpenses(cloudData.officeExpenses);
+          if (cloudData.projects) setProjects(cloudData.projects);
+          if (cloudData.projectExpenses) setProjectExpenses(cloudData.projectExpenses);
+
+          if (cloudData.masterPassword) {
+            localStorage.setItem('trendz_accounts_master_pwd', cloudData.masterPassword);
+          }
+
+          setCloudSyncStatus('synced');
+          setLastSyncTime(
+            new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+          );
+        } else {
+          // If the cloud is fresh and empty, upload the local dataset (e.g. from accountant's laptop)
+          saveToCloudData({
+            banks,
+            bankTransactions,
+            customers,
+            vendors,
+            vendorTransactions,
+            products,
+            stockMovements,
+            invoices,
+            receipts,
+            officeExpenses,
+            projects,
+            projectExpenses,
+            masterPassword: localStorage.getItem('trendz_accounts_master_pwd') || 'trendz123',
+          }).then(() => {
+            setCloudSyncStatus('synced');
+            setLastSyncTime(
+              new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+            );
+          });
+        }
+        isInitialLoadedRef.current = true;
+      },
+      (err) => {
+        console.warn('Real-time sync error:', err);
+        setCloudSyncStatus('error');
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  // 2. Sync local changes back to Cloud (Debounced)
+  useEffect(() => {
+    // Save to local storage
     localStorage.setItem('ah_banks', JSON.stringify(banks));
-  }, [banks]);
-
-  useEffect(() => {
     localStorage.setItem('ah_bank_txs', JSON.stringify(bankTransactions));
-  }, [bankTransactions]);
-
-  useEffect(() => {
     localStorage.setItem('ah_customers', JSON.stringify(customers));
-  }, [customers]);
-
-  useEffect(() => {
     localStorage.setItem('ah_vendors', JSON.stringify(vendors));
-  }, [vendors]);
-
-  useEffect(() => {
     localStorage.setItem('ah_vendor_txs', JSON.stringify(vendorTransactions));
-  }, [vendorTransactions]);
-
-  useEffect(() => {
     localStorage.setItem('ah_products', JSON.stringify(products));
-  }, [products]);
-
-  useEffect(() => {
     localStorage.setItem('ah_stock_movements', JSON.stringify(stockMovements));
-  }, [stockMovements]);
-
-  useEffect(() => {
+    localStorage.setItem('ah_stockMovements', JSON.stringify(stockMovements));
     localStorage.setItem('ah_invoices', JSON.stringify(invoices));
-  }, [invoices]);
-
-  useEffect(() => {
     localStorage.setItem('ah_receipts', JSON.stringify(receipts));
-  }, [receipts]);
-
-  useEffect(() => {
     localStorage.setItem('ah_office_expenses', JSON.stringify(officeExpenses));
-  }, [officeExpenses]);
-
-  useEffect(() => {
     localStorage.setItem('ah_projects', JSON.stringify(projects));
-  }, [projects]);
-
-  useEffect(() => {
     localStorage.setItem('ah_project_expenses', JSON.stringify(projectExpenses));
-  }, [projectExpenses]);
+
+    // If change came from remote snapshot, skip re-uploading
+    if (isRemoteUpdateRef.current) {
+      isRemoteUpdateRef.current = false;
+      return;
+    }
+
+    if (!isInitialLoadedRef.current) return;
+
+    setCloudSyncStatus('syncing');
+    const timer = setTimeout(() => {
+      saveToCloudData({
+        banks,
+        bankTransactions,
+        customers,
+        vendors,
+        vendorTransactions,
+        products,
+        stockMovements,
+        invoices,
+        receipts,
+        officeExpenses,
+        projects,
+        projectExpenses,
+        masterPassword: localStorage.getItem('trendz_accounts_master_pwd') || 'trendz123',
+      })
+        .then((success) => {
+          if (success) {
+            setCloudSyncStatus('synced');
+            setLastSyncTime(
+              new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+            );
+          } else {
+            setCloudSyncStatus('error');
+          }
+        })
+        .catch(() => setCloudSyncStatus('error'));
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [
+    banks,
+    bankTransactions,
+    customers,
+    vendors,
+    vendorTransactions,
+    products,
+    stockMovements,
+    invoices,
+    receipts,
+    officeExpenses,
+    projects,
+    projectExpenses,
+  ]);
+
+  // Force Manual Push / Pull to Cloud
+  const handleForceSync = async () => {
+    setCloudSyncStatus('syncing');
+    try {
+      const cloud = await fetchCurrentCloudData();
+      if (cloud && (cloud.invoices || cloud.banks)) {
+        isRemoteUpdateRef.current = true;
+        if (cloud.banks) setBanks(cloud.banks);
+        if (cloud.bankTransactions) setBankTransactions(cloud.bankTransactions);
+        if (cloud.customers) setCustomers(cloud.customers);
+        if (cloud.vendors) setVendors(cloud.vendors);
+        if (cloud.vendorTransactions) setVendorTransactions(cloud.vendorTransactions);
+        if (cloud.products) setProducts(cloud.products);
+        if (cloud.stockMovements) setStockMovements(cloud.stockMovements);
+        if (cloud.invoices) setInvoices(cloud.invoices);
+        if (cloud.receipts) setReceipts(cloud.receipts);
+        if (cloud.officeExpenses) setOfficeExpenses(cloud.officeExpenses);
+        if (cloud.projects) setProjects(cloud.projects);
+        if (cloud.projectExpenses) setProjectExpenses(cloud.projectExpenses);
+        setCloudSyncStatus('synced');
+        setLastSyncTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      } else {
+        await saveToCloudData({
+          banks,
+          bankTransactions,
+          customers,
+          vendors,
+          vendorTransactions,
+          products,
+          stockMovements,
+          invoices,
+          receipts,
+          officeExpenses,
+          projects,
+          projectExpenses,
+          masterPassword: localStorage.getItem('trendz_accounts_master_pwd') || 'trendz123',
+        });
+        setCloudSyncStatus('synced');
+        setLastSyncTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      }
+    } catch (err) {
+      console.error(err);
+      setCloudSyncStatus('error');
+    }
+  };
 
   // ============ HANDLERS ============
+
+  const handleRestoreData = (restored: AppDataPayload) => {
+    isRemoteUpdateRef.current = true;
+    if (restored.banks) {
+      setBanks(restored.banks);
+      localStorage.setItem('ah_banks', JSON.stringify(restored.banks));
+    }
+    if (restored.bankTransactions) {
+      setBankTransactions(restored.bankTransactions);
+      localStorage.setItem('ah_bank_txs', JSON.stringify(restored.bankTransactions));
+    }
+    if (restored.customers) {
+      setCustomers(restored.customers);
+      localStorage.setItem('ah_customers', JSON.stringify(restored.customers));
+    }
+    if (restored.vendors) {
+      setVendors(restored.vendors);
+      localStorage.setItem('ah_vendors', JSON.stringify(restored.vendors));
+    }
+    if (restored.vendorTransactions) {
+      setVendorTransactions(restored.vendorTransactions);
+      localStorage.setItem('ah_vendor_txs', JSON.stringify(restored.vendorTransactions));
+    }
+    if (restored.products) {
+      setProducts(restored.products);
+      localStorage.setItem('ah_products', JSON.stringify(restored.products));
+    }
+    if (restored.stockMovements) {
+      setStockMovements(restored.stockMovements);
+      localStorage.setItem('ah_stock_movements', JSON.stringify(restored.stockMovements));
+      localStorage.setItem('ah_stockMovements', JSON.stringify(restored.stockMovements));
+    }
+    if (restored.invoices) {
+      setInvoices(restored.invoices);
+      localStorage.setItem('ah_invoices', JSON.stringify(restored.invoices));
+    }
+    if (restored.receipts) {
+      setReceipts(restored.receipts);
+      localStorage.setItem('ah_receipts', JSON.stringify(restored.receipts));
+    }
+    if (restored.officeExpenses) {
+      setOfficeExpenses(restored.officeExpenses);
+      localStorage.setItem('ah_office_expenses', JSON.stringify(restored.officeExpenses));
+    }
+    if (restored.projects) {
+      setProjects(restored.projects);
+      localStorage.setItem('ah_projects', JSON.stringify(restored.projects));
+    }
+    if (restored.projectExpenses) {
+      setProjectExpenses(restored.projectExpenses);
+      localStorage.setItem('ah_project_expenses', JSON.stringify(restored.projectExpenses));
+    }
+    if (restored.masterPassword) {
+      localStorage.setItem('trendz_accounts_master_pwd', restored.masterPassword);
+    }
+  };
 
   // Banks
   const handleAddBank = (bank: Omit<Bank, 'id'>) => {
@@ -262,6 +467,16 @@ export default function App() {
         ]);
       }
     }
+  };
+
+  const handleUpdateVendorTx = (id: number, updated: Partial<VendorTransaction>) => {
+    setVendorTransactions((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, ...updated } : t))
+    );
+  };
+
+  const handleDeleteVendorTx = (id: number) => {
+    setVendorTransactions((prev) => prev.filter((t) => t.id !== id));
   };
 
   // Stock / Products
@@ -705,6 +920,10 @@ export default function App() {
         lowStockCount={lowStockCount}
         totalBanksCount={banks.length}
         receiptsCount={receipts.length}
+        cloudSyncStatus={cloudSyncStatus}
+        lastSyncTime={lastSyncTime}
+        onForceSync={handleForceSync}
+        onOpenBackup={() => setIsBackupModalOpen(true)}
         onLock={() => {
           sessionStorage.removeItem('trendz_auth_unlocked');
           setIsAuthenticated(false);
@@ -780,6 +999,8 @@ export default function App() {
               onUpdateVendor={handleUpdateVendor}
               onDeleteVendor={handleDeleteVendor}
               onAddVendorTransaction={handleAddVendorTx}
+              onUpdateVendorTransaction={handleUpdateVendorTx}
+              onDeleteVendorTransaction={handleDeleteVendorTx}
               onOpenWhatsApp={(msg) => setWhatsAppMsg(msg)}
             />
           )}
@@ -819,6 +1040,30 @@ export default function App() {
               onOpenWhatsApp={(msg) => setWhatsAppMsg(msg)}
             />
           )}
+
+          {activeTab === 'backup' && (
+            <BackupRestoreView
+              currentData={{
+                banks,
+                bankTransactions,
+                customers,
+                vendors,
+                vendorTransactions,
+                products,
+                stockMovements,
+                invoices,
+                receipts,
+                officeExpenses,
+                projects,
+                projectExpenses,
+                masterPassword: localStorage.getItem('trendz_accounts_master_pwd') || 'trendz123',
+              }}
+              onRestoreData={handleRestoreData}
+              cloudSyncStatus={cloudSyncStatus}
+              lastSyncTime={lastSyncTime}
+              onForceSync={handleForceSync}
+            />
+          )}
         </div>
       </main>
 
@@ -826,6 +1071,28 @@ export default function App() {
       <WhatsAppModal
         message={whatsAppMsg}
         onClose={() => setWhatsAppMsg(null)}
+      />
+
+      {/* Data Backup & Restore Modal */}
+      <DataBackupModal
+        isOpen={isBackupModalOpen}
+        onClose={() => setIsBackupModalOpen(false)}
+        currentData={{
+          banks,
+          bankTransactions,
+          customers,
+          vendors,
+          vendorTransactions,
+          products,
+          stockMovements,
+          invoices,
+          receipts,
+          officeExpenses,
+          projects,
+          projectExpenses,
+          masterPassword: localStorage.getItem('trendz_accounts_master_pwd') || 'trendz123',
+        }}
+        onRestoreData={handleRestoreData}
       />
     </div>
   );

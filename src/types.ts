@@ -15,6 +15,8 @@ export interface BankTransaction {
   description: string;
   debit: number; // Deposit (+)
   credit: number; // Withdrawal / Expense (-)
+  receipt_image?: string; // Optional voucher/receipt image (Data URL)
+  receipt_image_name?: string;
 }
 
 export interface Customer {
@@ -44,6 +46,8 @@ export interface VendorTransaction {
   discount: number;
   amount: number;
   trans_type: 'debit' | 'credit';
+  receipt_image?: string; // Optional voucher/bill photo
+  receipt_image_name?: string;
 }
 
 export interface Product {
@@ -125,6 +129,8 @@ export interface PaymentReceipt {
   received_by?: string;
   notes?: string;
   project_name?: string;
+  receipt_image?: string; // Optional manual receipt slip or online voucher
+  receipt_image_name?: string;
 }
 
 // Office Expenses Schema
@@ -140,6 +146,8 @@ export interface OfficeExpense {
   amount: number;
   notes?: string;
   created_by?: string;
+  receipt_image?: string; // Optional bill, voucher, or payment receipt image
+  receipt_image_name?: string;
 }
 
 // Project Expenses Schema
@@ -166,6 +174,8 @@ export interface ProjectExpense {
   bank_id?: number;
   amount: number;
   notes?: string;
+  receipt_image?: string; // Optional contractor voucher or receipt slip
+  receipt_image_name?: string;
 }
 
 export type ActiveTab = 
@@ -179,4 +189,5 @@ export type ActiveTab =
   | 'receipts'
   | 'receipt_memos'
   | 'office_expenses' 
-  | 'project_expenses';
+  | 'project_expenses'
+  | 'backup';

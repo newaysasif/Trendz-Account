@@ -18,9 +18,13 @@ import {
   Layers,
   Banknote,
   Filter,
+  Pin,
+  PinOff,
 } from 'lucide-react';
 import { PaymentReceipt, Customer, Invoice, Bank } from '../types';
 import { TrendzLogo, TrendzLogoMark } from './TrendzLogo';
+import { ReceiptImageUploader } from './ReceiptImageUploader';
+import { ReceiptThumbnail } from './ReceiptThumbnail';
 
 interface ReceiptMemosViewProps {
   receipts: PaymentReceipt[];
@@ -89,6 +93,7 @@ export const ReceiptMemosView: React.FC<ReceiptMemosViewProps> = ({
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingReceipt, setEditingReceipt] = useState<PaymentReceipt | null>(null);
   const [viewingReceipt, setViewingReceipt] = useState<PaymentReceipt | null>(null);
+  const [freezeColumns, setFreezeColumns] = useState(true);
 
   // Form State
   const [receiptNo, setReceiptNo] = useState('');
@@ -104,6 +109,8 @@ export const ReceiptMemosView: React.FC<ReceiptMemosViewProps> = ({
   const [transactionRef, setTransactionRef] = useState('');
   const [receivedBy, setReceivedBy] = useState('Accounts Dept / Trendz Interior');
   const [notes, setNotes] = useState('');
+  const [receiptImage, setReceiptImage] = useState<string | undefined>(undefined);
+  const [receiptImageName, setReceiptImageName] = useState<string | undefined>(undefined);
 
   const filteredReceipts = useMemo(() => {
     return receipts
@@ -158,6 +165,8 @@ export const ReceiptMemosView: React.FC<ReceiptMemosViewProps> = ({
     setTransactionRef('');
     setReceivedBy('Accounts Dept / Trendz Interior');
     setNotes('Received with thanks against interior architecture & design services');
+    setReceiptImage(undefined);
+    setReceiptImageName(undefined);
     setIsAddModalOpen(true);
   };
 
@@ -176,6 +185,8 @@ export const ReceiptMemosView: React.FC<ReceiptMemosViewProps> = ({
     setTransactionRef(rec.transaction_ref || '');
     setReceivedBy(rec.received_by || 'Accounts Dept / Trendz Interior');
     setNotes(rec.notes || '');
+    setReceiptImage(rec.receipt_image);
+    setReceiptImageName(rec.receipt_image_name);
     setIsAddModalOpen(true);
   };
 
@@ -231,6 +242,8 @@ export const ReceiptMemosView: React.FC<ReceiptMemosViewProps> = ({
         transaction_ref: transactionRef,
         received_by: receivedBy,
         notes,
+        receipt_image: receiptImage,
+        receipt_image_name: receiptImageName,
       });
     } else {
       onAddReceipt({
@@ -248,6 +261,8 @@ export const ReceiptMemosView: React.FC<ReceiptMemosViewProps> = ({
         transaction_ref: transactionRef,
         received_by: receivedBy,
         notes,
+        receipt_image: receiptImage,
+        receipt_image_name: receiptImageName,
       });
     }
 
@@ -381,7 +396,29 @@ export const ReceiptMemosView: React.FC<ReceiptMemosViewProps> = ({
             className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
           />
         </div>
-        <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end flex-wrap">
+          <button
+            onClick={() => setFreezeColumns(!freezeColumns)}
+            title="Toggle frozen Customer Name and Amount columns when scrolling"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors cursor-pointer shadow-xs ${
+              freezeColumns
+                ? 'bg-purple-50 border-purple-300 text-purple-800 hover:bg-purple-100'
+                : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            {freezeColumns ? (
+              <>
+                <Pin className="w-3.5 h-3.5 text-purple-600 fill-purple-600" />
+                <span>Frozen: Name & Amount (ON)</span>
+              </>
+            ) : (
+              <>
+                <PinOff className="w-3.5 h-3.5 text-slate-400" />
+                <span>Freeze: OFF</span>
+              </>
+            )}
+          </button>
+
           <select
             value={modeFilter}
             onChange={(e) => setModeFilter(e.target.value)}
@@ -399,33 +436,95 @@ export const ReceiptMemosView: React.FC<ReceiptMemosViewProps> = ({
         </div>
       </div>
 
-      {/* Receipt Memos Table */}
+      {/* Receipt Memos Table with Freeze Panes */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-sm">
-            <thead>
-              <tr className="bg-slate-100/90 text-slate-700 text-xs uppercase font-bold border-b border-slate-200">
-                <th className="py-3.5 px-4">Receipt #</th>
-                <th className="py-3.5 px-4">Date</th>
-                <th className="py-3.5 px-4">Customer Name</th>
+        <div className="overflow-x-auto max-h-[75vh] overflow-y-auto relative">
+          <table className="w-full text-left border-collapse text-sm min-w-[950px]">
+            <thead className="sticky top-0 z-20 bg-slate-100/95 backdrop-blur-xs shadow-xs border-b border-slate-200">
+              <tr className="text-slate-700 text-xs uppercase font-bold">
+                <th
+                  className={`py-3.5 px-4 w-28 ${
+                    freezeColumns ? 'sticky left-0 z-30 bg-slate-100' : ''
+                  }`}
+                >
+                  Receipt #
+                </th>
+                <th className="py-3.5 px-4 w-28 whitespace-nowrap">Date</th>
+                <th
+                  className={`py-3.5 px-4 min-w-[200px] ${
+                    freezeColumns
+                      ? 'sticky left-28 z-30 bg-slate-100 border-r border-slate-200 shadow-[4px_0_6px_-2px_rgba(0,0,0,0.06)]'
+                      : ''
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>Customer Name</span>
+                    {freezeColumns && (
+                      <span className="text-[10px] text-purple-700 font-bold bg-purple-100 px-1.5 py-0.2 rounded">
+                        Frozen
+                      </span>
+                    )}
+                  </div>
+                </th>
                 <th className="py-3.5 px-4">Against Inv / Scope</th>
                 <th className="py-3.5 px-4">Payment Mode</th>
-                <th className="py-3.5 px-4 text-right font-bold text-emerald-700">Amount (Rs.)</th>
-                <th className="py-3.5 px-4 text-center no-print">Actions</th>
+                <th
+                  className={`py-3.5 px-4 text-right font-black text-emerald-700 w-44 ${
+                    freezeColumns
+                      ? 'sticky right-36 z-30 bg-slate-100 border-l border-slate-200 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.06)]'
+                      : ''
+                  }`}
+                >
+                  <div className="flex items-center justify-end gap-1.5">
+                    <span>Amount (Rs.)</span>
+                    {freezeColumns && (
+                      <span className="text-[10px] text-emerald-700 font-bold bg-emerald-100 px-1.5 py-0.2 rounded">
+                        Frozen
+                      </span>
+                    )}
+                  </div>
+                </th>
+                <th
+                  className={`py-3.5 px-4 text-center no-print w-36 ${
+                    freezeColumns ? 'sticky right-0 z-30 bg-slate-100' : ''
+                  }`}
+                >
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
               {filteredReceipts.length > 0 ? (
                 filteredReceipts.map((rec) => (
-                  <tr key={rec.id} className="hover:bg-slate-50/80 transition-colors group">
-                    <td className="py-3 px-4 font-mono font-bold text-purple-700 whitespace-nowrap">
+                  <tr key={rec.id} className="hover:bg-slate-50/90 transition-colors group">
+                    <td
+                      className={`py-3 px-4 font-mono font-bold text-purple-700 whitespace-nowrap ${
+                        freezeColumns ? 'sticky left-0 z-10 bg-white group-hover:bg-slate-50' : ''
+                      }`}
+                    >
                       {rec.receipt_no}
                     </td>
                     <td className="py-3 px-4 text-slate-700 whitespace-nowrap font-mono text-xs">
                       {rec.receipt_date}
                     </td>
-                    <td className="py-3 px-4">
-                      <div className="font-bold text-slate-900">{rec.customer_name}</div>
+                    <td
+                      className={`py-3 px-4 ${
+                        freezeColumns
+                          ? 'sticky left-28 z-10 bg-white group-hover:bg-slate-50 border-r border-slate-200 shadow-[4px_0_6px_-2px_rgba(0,0,0,0.06)]'
+                          : ''
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="font-bold text-slate-900">{rec.customer_name}</div>
+                        {rec.receipt_image && (
+                          <ReceiptThumbnail
+                            image={rec.receipt_image}
+                            imageName={rec.receipt_image_name}
+                            title={`Voucher #${rec.receipt_no}`}
+                            size="sm"
+                          />
+                        )}
+                      </div>
                       {rec.transaction_ref && (
                         <div className="text-xs text-slate-400 font-mono">Ref: {rec.transaction_ref}</div>
                       )}
@@ -451,10 +550,20 @@ export const ReceiptMemosView: React.FC<ReceiptMemosViewProps> = ({
                         <span>{rec.payment_mode}</span>
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-right font-mono font-black text-emerald-600 text-base whitespace-nowrap">
+                    <td
+                      className={`py-3 px-4 text-right font-mono font-black text-emerald-600 text-base whitespace-nowrap ${
+                        freezeColumns
+                          ? 'sticky right-36 z-10 bg-white group-hover:bg-slate-50 border-l border-slate-200 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.06)]'
+                          : ''
+                      }`}
+                    >
                       Rs. {rec.amount_received.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </td>
-                    <td className="py-3 px-4 text-center no-print">
+                    <td
+                      className={`py-3 px-4 text-center no-print ${
+                        freezeColumns ? 'sticky right-0 z-10 bg-white group-hover:bg-slate-50' : ''
+                      }`}
+                    >
                       <div className="flex items-center justify-center gap-1">
                         <button
                           onClick={() => setViewingReceipt(rec)}
@@ -756,6 +865,21 @@ export const ReceiptMemosView: React.FC<ReceiptMemosViewProps> = ({
                 />
               </div>
 
+              {/* Receipt / Voucher Image Attachment */}
+              <div className="p-3 bg-slate-900 rounded-xl border border-slate-700">
+                <ReceiptImageUploader
+                  idPrefix="receipt-memo"
+                  receiptImage={receiptImage}
+                  receiptImageName={receiptImageName}
+                  onChange={(img, name) => {
+                    setReceiptImage(img);
+                    setReceiptImageName(name);
+                  }}
+                  label="Attach Manual Receipt / Online Bank Transfer Voucher"
+                  helperText="Upload physical signed receipt slip, counter receipt, or bank payment screenshot"
+                />
+              </div>
+
               <div className="pt-3 border-t border-slate-200 flex justify-end gap-2">
                 <button
                   type="button"
@@ -901,6 +1025,32 @@ export const ReceiptMemosView: React.FC<ReceiptMemosViewProps> = ({
                 <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-slate-700">
                   <strong className="text-slate-900 block mb-0.5">Remarks:</strong>
                   {viewingReceipt.notes}
+                </div>
+              )}
+
+              {/* Attached Voucher / Receipt Slip Image */}
+              {viewingReceipt.receipt_image && (
+                <div className="border border-purple-200 bg-purple-50/40 rounded-xl p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold uppercase text-purple-900 flex items-center gap-1.5">
+                      Attached Physical Slip / Online Voucher:
+                    </span>
+                    <a
+                      href={viewingReceipt.receipt_image}
+                      download={viewingReceipt.receipt_image_name || 'voucher-slip.jpg'}
+                      className="text-2xs text-purple-700 hover:text-purple-900 underline font-semibold no-print cursor-pointer"
+                    >
+                      Download Original
+                    </a>
+                  </div>
+                  <div className="flex justify-center bg-white rounded-lg p-2 border border-purple-100">
+                    <img
+                      src={viewingReceipt.receipt_image}
+                      alt="Attached Receipt Voucher"
+                      referrerPolicy="no-referrer"
+                      className="max-h-56 object-contain rounded"
+                    />
+                  </div>
                 </div>
               )}
             </div>

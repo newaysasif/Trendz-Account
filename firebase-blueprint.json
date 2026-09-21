@@ -1,0 +1,143 @@
+{
+  "entities": {
+    "bank": {
+      "title": "Bank",
+      "description": "Company bank accounts",
+      "type": "object",
+      "properties": {
+        "id": { "type": "number" },
+        "bank_name": { "type": "string" },
+        "account_no": { "type": "string" },
+        "branch": { "type": "string" },
+        "holder_name": { "type": "string" },
+        "open_date": { "type": "string" },
+        "opening_balance": { "type": "number" }
+      }
+    },
+    "bank_transaction": {
+      "title": "Bank Transaction",
+      "description": "Bank account deposit and withdrawal transactions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "number" },
+        "bank_id": { "type": "number" },
+        "trans_date": { "type": "string" },
+        "description": { "type": "string" },
+        "debit": { "type": "number" },
+        "credit": { "type": "number" }
+      }
+    },
+    "customer": {
+      "title": "Customer",
+      "description": "Client details and contacts",
+      "type": "object",
+      "properties": {
+        "id": { "type": "number" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "address": { "type": "string" },
+        "email": { "type": "string" }
+      }
+    },
+    "vendor": {
+      "title": "Vendor",
+      "description": "Supplier and vendor accounts",
+      "type": "object",
+      "properties": {
+        "id": { "type": "number" },
+        "name": { "type": "string" },
+        "company_name": { "type": "string" },
+        "phone": { "type": "string" },
+        "address": { "type": "string" },
+        "email": { "type": "string" }
+      }
+    },
+    "invoice": {
+      "title": "Invoice",
+      "description": "Client invoices and estimates",
+      "type": "object",
+      "properties": {
+        "id": { "type": "number" },
+        "invoice_no": { "type": "string" },
+        "invoice_date": { "type": "string" },
+        "customer_name": { "type": "string" },
+        "customer_phone": { "type": "string" },
+        "customer_address": { "type": "string" },
+        "subtotal": { "type": "number" },
+        "advance_amount": { "type": "number" },
+        "tax_deduction": { "type": "number" },
+        "total_discount": { "type": "number" },
+        "total_tax": { "type": "number" },
+        "grand_total": { "type": "number" },
+        "paid_amount": { "type": "number" },
+        "due_amount": { "type": "number" },
+        "status": { "type": "string" },
+        "items": { "type": "array" }
+      }
+    },
+    "receipt": {
+      "title": "Payment Receipt",
+      "description": "Customer payment receipts and memos",
+      "type": "object",
+      "properties": {
+        "id": { "type": "number" },
+        "receipt_no": { "type": "string" },
+        "receipt_date": { "type": "string" },
+        "customer_name": { "type": "string" },
+        "amount_received": { "type": "number" },
+        "payment_mode": { "type": "string" }
+      }
+    },
+    "office_expense": {
+      "title": "Office Expense",
+      "description": "Shop and office operational expenses",
+      "type": "object",
+      "properties": {
+        "id": { "type": "number" },
+        "expense_date": { "type": "string" },
+        "category": { "type": "string" },
+        "description": { "type": "string" },
+        "paid_to": { "type": "string" },
+        "payment_method": { "type": "string" },
+        "amount": { "type": "number" }
+      }
+    },
+    "project_expense": {
+      "title": "Project Expense",
+      "description": "Site fitout project costs and labor",
+      "type": "object",
+      "properties": {
+        "id": { "type": "number" },
+        "project_id": { "type": "number" },
+        "project_name": { "type": "string" },
+        "expense_date": { "type": "string" },
+        "expense_type": { "type": "string" },
+        "description": { "type": "string" },
+        "contractor_supplier": { "type": "string" },
+        "amount": { "type": "number" }
+      }
+    }
+  },
+  "firestore": {
+    "/trendz_erp/data": {
+      "description": "Master document storing real-time ERP synced state",
+      "schema": {
+        "banks": "array",
+        "bank_transactions": "array",
+        "customers": "array",
+        "vendors": "array",
+        "vendor_transactions": "array",
+        "products": "array",
+        "stock_movements": "array",
+        "invoices": "array",
+        "receipts": "array",
+        "office_expenses": "array",
+        "projects": "array",
+        "project_expenses": "array",
+        "master_password": "string",
+        "last_updated": "string",
+        "updated_by": "string"
+      }
+    }
+  }
+}

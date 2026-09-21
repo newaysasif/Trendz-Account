@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { Lock, Unlock, Eye, EyeOff, ShieldCheck, KeyRound, Sparkles, RefreshCw, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Lock, Unlock, Eye, EyeOff, ShieldCheck, KeyRound, Sparkles, RefreshCw, CheckCircle2, Cloud } from 'lucide-react';
 import { TrendzLogoMark } from './TrendzLogo';
+import { fetchCurrentCloudData, saveToCloudData } from '../services/firebaseSync';
 
 interface AuthLockScreenProps {
   onUnlock: () => void;
@@ -12,6 +13,7 @@ export const AuthLockScreen: React.FC<AuthLockScreenProps> = ({ onUnlock }) => {
   const [error, setError] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [cloudMasterPwd, setCloudMasterPwd] = useState<string | null>(null);
 
   // Password management states
   const [currentPasswordInput, setCurrentPasswordInput] = useState('');
@@ -20,8 +22,18 @@ export const AuthLockScreen: React.FC<AuthLockScreenProps> = ({ onUnlock }) => {
   const [changeError, setChangeError] = useState('');
   const [changeSuccess, setChangeSuccess] = useState('');
 
+  useEffect(() => {
+    // Check if cloud has a configured master password
+    fetchCurrentCloudData().then((cloudData) => {
+      if (cloudData && cloudData.masterPassword) {
+        setCloudMasterPwd(cloudData.masterPassword);
+        localStorage.setItem('trendz_accounts_master_pwd', cloudData.masterPassword);
+      }
+    });
+  }, []);
+
   const getStoredPassword = () => {
-    return localStorage.getItem('trendz_accounts_master_pwd') || 'trendz123';
+    return cloudMasterPwd || localStorage.getItem('trendz_accounts_master_pwd') || 'trendz123';
   };
 
   const handleUnlock = (e?: React.FormEvent) => {
@@ -45,7 +57,7 @@ export const AuthLockScreen: React.FC<AuthLockScreenProps> = ({ onUnlock }) => {
     setError('');
   };
 
-  const handleChangePassword = (e: React.FormEvent) => {
+  const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setChangeError('');
     setChangeSuccess('');
@@ -65,6 +77,21 @@ export const AuthLockScreen: React.FC<AuthLockScreenProps> = ({ onUnlock }) => {
     }
 
     localStorage.setItem('trendz_accounts_master_pwd', newPasswordInput);
+    setCloudMasterPwd(newPasswordInput);
+
+    // Sync to cloud if available
+    try {
+      const currentCloud = await fetchCurrentCloudData();
+      if (currentCloud) {
+        await saveToCloudData({
+          ...currentCloud,
+          masterPassword: newPasswordInput,
+        });
+      }
+    } catch (err) {
+      console.warn('Could not sync password to cloud:', err);
+    }
+
     setChangeSuccess('Password successfully updated! You can now log in.');
     setCurrentPasswordInput('');
     setNewPasswordInput('');

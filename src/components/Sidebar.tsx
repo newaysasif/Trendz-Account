@@ -18,6 +18,10 @@ import {
   CreditCard,
   Lock,
   ShieldCheck,
+  Cloud,
+  RefreshCw,
+  CheckCircle,
+  Database,
 } from 'lucide-react';
 import { ActiveTab } from '../types';
 import { TrendzLogoMark, TrendzLogo } from './TrendzLogo';
@@ -31,6 +35,10 @@ interface SidebarProps {
   totalBanksCount: number;
   receiptsCount?: number;
   onLock?: () => void;
+  onOpenBackup?: () => void;
+  cloudSyncStatus?: 'synced' | 'syncing' | 'offline' | 'error';
+  lastSyncTime?: string | null;
+  onForceSync?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -42,6 +50,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   totalBanksCount,
   receiptsCount = 0,
   onLock,
+  onOpenBackup,
+  cloudSyncStatus = 'synced',
+  lastSyncTime,
+  onForceSync,
 }) => {
   const [expenseDropdownOpen, setExpenseDropdownOpen] = useState(
     activeTab === 'office_expenses' || activeTab === 'project_expenses'
@@ -66,13 +78,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
             TRENDZ INTERIOR
           </span>
         </div>
-        <button
-          onClick={() => setMobileOpen(!mobileOpen)}
-          className="p-2 rounded hover:bg-slate-800 text-gray-200 cursor-pointer"
-          aria-label="Toggle Navigation Menu"
-        >
-          {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-        </button>
+        <div className="flex items-center gap-1.5">
+          {onOpenBackup && (
+            <button
+              onClick={onOpenBackup}
+              title="Backup Data"
+              className="p-1.5 rounded bg-slate-800 text-blue-400 hover:text-white cursor-pointer"
+            >
+              <Database className="w-4 h-4" />
+            </button>
+          )}
+          <button
+            onClick={() => setMobileOpen(!mobileOpen)}
+            className="p-2 rounded hover:bg-slate-800 text-gray-200 cursor-pointer"
+            aria-label="Toggle Navigation Menu"
+          >
+            {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          </button>
+        </div>
       </div>
 
       {/* Sidebar Overlay on Mobile */}
@@ -309,6 +332,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             )}
           </div>
+
+          {/* Backup & Restore Data Tab */}
+          <div className="pt-2">
+            <button
+              onClick={() => handleNavClick('backup')}
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg transition-colors font-medium text-left cursor-pointer ${
+                activeTab === 'backup'
+                  ? 'bg-[#0d6efd] text-white shadow-sm'
+                  : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Database className="w-4 h-4 text-blue-400" />
+                <span>Backup & Restore Data</span>
+              </div>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-900/60 text-blue-200 border border-blue-700/50 font-semibold">
+                Safe
+              </span>
+            </button>
+          </div>
         </nav>
 
         {/* Sidebar Footer Info */}
@@ -320,17 +363,62 @@ export const Sidebar: React.FC<SidebarProps> = ({
               Secure Session
             </span>
           </div>
-          <p className="text-[11px] text-slate-500 m-0">Suite # LG - 11 Continental Shopping Mall</p>
 
-          {onLock && (
-            <button
-              onClick={onLock}
-              className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-slate-900/90 hover:bg-rose-950/40 border border-slate-700/60 hover:border-rose-700/50 text-slate-300 hover:text-rose-300 text-xs font-semibold transition-all cursor-pointer shadow-xs"
-            >
-              <Lock className="w-3.5 h-3.5" />
-              <span>Lock Accounts Portal</span>
-            </button>
-          )}
+          {/* Real-time Cloud Sync Badge */}
+          <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-700/60 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Cloud className={`w-3.5 h-3.5 ${
+                cloudSyncStatus === 'syncing'
+                  ? 'text-amber-400 animate-spin'
+                  : cloudSyncStatus === 'error'
+                  ? 'text-rose-400'
+                  : 'text-emerald-400'
+              }`} />
+              <div>
+                <p className="text-[11px] font-semibold text-slate-200 m-0 flex items-center gap-1">
+                  {cloudSyncStatus === 'syncing' ? 'Syncing Cloud...' : 'Cloud Real-Time Live'}
+                </p>
+                <p className="text-[9px] text-slate-400 m-0">
+                  {lastSyncTime ? `Synced: ${lastSyncTime}` : 'All devices connected'}
+                </p>
+              </div>
+            </div>
+            {onForceSync && (
+              <button
+                onClick={onForceSync}
+                title="Force Sync with Cloud"
+                className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-amber-300 transition-colors cursor-pointer"
+              >
+                <RefreshCw className={`w-3 h-3 ${cloudSyncStatus === 'syncing' ? 'animate-spin text-amber-400' : ''}`} />
+              </button>
+            )}
+          </div>
+
+          <p className="text-[10px] text-slate-500 m-0">Suite # LG - 11 Continental Shopping Mall</p>
+
+          <div className="flex gap-2 pt-1">
+            {onOpenBackup && (
+              <button
+                onClick={onOpenBackup}
+                title="Backup & Restore Accounts Data"
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 border border-slate-700/60 hover:border-slate-600 text-slate-300 hover:text-white text-[11px] font-medium transition-all cursor-pointer shadow-xs"
+              >
+                <Database className="w-3.5 h-3.5 text-blue-400" />
+                <span>Backup Data</span>
+              </button>
+            )}
+
+            {onLock && (
+              <button
+                onClick={onLock}
+                title="Lock Session"
+                className="flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-lg bg-slate-900/90 hover:bg-rose-950/40 border border-slate-700/60 hover:border-rose-700/50 text-slate-300 hover:text-rose-300 text-[11px] font-medium transition-all cursor-pointer shadow-xs"
+              >
+                <Lock className="w-3.5 h-3.5" />
+                <span>Lock</span>
+              </button>
+            )}
+          </div>
         </div>
       </aside>
     </>
